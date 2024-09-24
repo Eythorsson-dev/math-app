@@ -92,8 +92,32 @@ mod expression {
     use crate::{AllowedOperators, ConstantOption, Error, Operator, OperatorWeights, Result};
 
     #[derive(Debug, Clone, Copy)]
+    pub struct Constant(i32);
+
+    impl Constant {
+        pub fn new(value: i32) -> Self {
+            Constant(value)
+        }
+        pub fn to_string(&self) -> String {
+            self.0.to_string()
+        }
+    }
+
+    impl From<Constant> for f32 {
+        fn from(value: Constant) -> Self {
+            value.0 as f32
+        }
+    }
+
+    impl From<Constant> for Expression {
+        fn from(value: Constant) -> Self {
+            Expression::Term(Term::Constant(value))
+        }
+    }
+
+    #[derive(Debug, Clone, Copy)]
     pub enum Term {
-        Constant(i32),
+        Constant(Constant),
     }
 
     impl Term {
@@ -102,7 +126,7 @@ mod expression {
 
             let constant = rng.gen_range(constant.min..=constant.max);
 
-            Term::Constant(constant)
+            Term::Constant(Constant(constant))
         }
 
         pub fn format_str(&self) -> String {
@@ -228,7 +252,7 @@ mod expression {
             // 1+3*(2-4)
             match self {
                 Expression::Term(term) => match term {
-                    Term::Constant(constant) => *constant as f32,
+                    Term::Constant(constant) => (*constant).into(),
                 },
                 Expression::Sum(sum) => sum.get_answer(),
                 Expression::Subtract(subtract) => subtract.get_answer(),
@@ -334,7 +358,7 @@ impl OperatorWeights {
 #[cfg(test)]
 mod tests {
     use crate::{
-        expression::{Divide, Expression, Multiplication, Subtract, Sum, Term},
+        expression::{Constant, Divide, Expression, Multiplication, Subtract, Sum},
         AllowedOperators, ConstantOption, Equation, ExpressionOption, Operator, OperatorWeights,
         TermCount,
     };
@@ -378,30 +402,27 @@ mod tests {
         // 1+2*(3-4)+5/(6/(7-8))
         let expression = Expression::Sum(
             Sum::new(vec![
-                Expression::Term(Term::Constant(1)),
+                Constant::new(1).into(),
                 Expression::Multiply(
                     Multiplication::new(vec![
-                        Expression::Term(Term::Constant(2)),
+                        Constant::new(2).into(),
                         Expression::Subtract(
-                            Subtract::new(vec![
-                                Expression::Term(Term::Constant(3)),
-                                Expression::Term(Term::Constant(4)),
-                            ])
-                            .unwrap(),
+                            Subtract::new(vec![Constant::new(3).into(), Constant::new(4).into()])
+                                .unwrap(),
                         ),
                     ])
                     .unwrap(),
                 ),
                 Expression::Divide(
                     Divide::new(vec![
-                        Expression::Term(Term::Constant(5)),
+                        Constant::new(5).into(),
                         Expression::Divide(
                             Divide::new(vec![
-                                Expression::Term(Term::Constant(6)),
+                                Constant::new(6).into(),
                                 Expression::Subtract(
                                     Subtract::new(vec![
-                                        Expression::Term(Term::Constant(7)),
-                                        Expression::Term(Term::Constant(8)),
+                                        Constant::new(7).into(),
+                                        Constant::new(8).into(),
                                     ])
                                     .unwrap(),
                                 ),
@@ -415,10 +436,7 @@ mod tests {
             .unwrap(),
         );
 
-        assert_eq!(
-            expression.formatted_vec().join(""),
-            "1+2*(3-4)+5/(6/(7-8))"
-        )
+        assert_eq!(expression.formatted_vec().join(""), "1+2*(3-4)+5/(6/(7-8))")
     }
 
     #[test]
@@ -426,26 +444,23 @@ mod tests {
         // 1+3*(2-4)+10/5/2
         let expression = Expression::Sum(
             Sum::new(vec![
-                Expression::Term(Term::Constant(1)),
+                Constant::new(1).into(),
                 Expression::Multiply(
                     Multiplication::new(vec![
-                        Expression::Term(Term::Constant(3)),
-                        Expression::Term(Term::Constant(-2)),
+                        Constant::new(3).into(),
+                        Constant::new(-2).into(),
                         Expression::Subtract(
-                            Subtract::new(vec![
-                                Expression::Term(Term::Constant(2)),
-                                Expression::Term(Term::Constant(4)),
-                            ])
-                            .unwrap(),
+                            Subtract::new(vec![Constant::new(2).into(), Constant::new(4).into()])
+                                .unwrap(),
                         ),
                     ])
                     .unwrap(),
                 ),
                 Expression::Divide(
                     Divide::new(vec![
-                        Expression::Term(Term::Constant(10)),
-                        Expression::Term(Term::Constant(5)),
-                        Expression::Term(Term::Constant(2)),
+                        Constant::new(10).into(),
+                        Constant::new(5).into(),
+                        Constant::new(2).into(),
                     ])
                     .unwrap(),
                 ),
@@ -459,15 +474,15 @@ mod tests {
     }
 
     mod division {
-        use crate::expression::{Divide, Expression, Term};
+        use crate::expression::{Constant, Divide, Expression};
 
         #[test]
         fn multiple() {
             let expression = Expression::Divide(
                 Divide::new(vec![
-                    Expression::Term(Term::Constant(12)),
-                    Expression::Term(Term::Constant(3)),
-                    Expression::Term(Term::Constant(2)),
+                    Constant::new(12).into(),
+                    Constant::new(3).into(),
+                    Constant::new(2).into(),
                 ])
                 .unwrap(),
             );
@@ -481,13 +496,10 @@ mod tests {
         fn nested() {
             let expression = Expression::Divide(
                 Divide::new(vec![
-                    Expression::Term(Term::Constant(30)),
+                    Constant::new(30).into(),
                     Expression::Divide(
-                        Divide::new(vec![
-                            Expression::Term(Term::Constant(6)),
-                            Expression::Term(Term::Constant(2)),
-                        ])
-                        .unwrap(),
+                        Divide::new(vec![Constant::new(6).into(), Constant::new(2).into()])
+                            .unwrap(),
                     ),
                 ])
                 .unwrap(),
@@ -500,15 +512,15 @@ mod tests {
     }
 
     mod multiplication {
-        use crate::expression::{Expression, Multiplication, Term};
+        use crate::expression::{Constant, Expression, Multiplication};
 
         #[test]
         fn multiple() {
             let expression = Expression::Multiply(
                 Multiplication::new(vec![
-                    Expression::Term(Term::Constant(12)),
-                    Expression::Term(Term::Constant(3)),
-                    Expression::Term(Term::Constant(2)),
+                    Constant::new(12).into(),
+                    Constant::new(3).into(),
+                    Constant::new(2).into(),
                 ])
                 .unwrap(),
             );
@@ -522,13 +534,10 @@ mod tests {
         fn nested() {
             let expression = Expression::Multiply(
                 Multiplication::new(vec![
-                    Expression::Term(Term::Constant(30)),
+                    Constant::new(30).into(),
                     Expression::Multiply(
-                        Multiplication::new(vec![
-                            Expression::Term(Term::Constant(6)),
-                            Expression::Term(Term::Constant(2)),
-                        ])
-                        .unwrap(),
+                        Multiplication::new(vec![Constant::new(6).into(), Constant::new(2).into()])
+                            .unwrap(),
                     ),
                 ])
                 .unwrap(),
@@ -541,15 +550,15 @@ mod tests {
     }
 
     mod sum {
-        use crate::expression::{Expression, Sum, Term};
+        use crate::expression::{Constant, Expression, Sum};
 
         #[test]
         fn multiple() {
             let expression = Expression::Sum(
                 Sum::new(vec![
-                    Expression::Term(Term::Constant(12)),
-                    Expression::Term(Term::Constant(3)),
-                    Expression::Term(Term::Constant(2)),
+                    Constant::new(12).into(),
+                    Constant::new(3).into(),
+                    Constant::new(2).into(),
                 ])
                 .unwrap(),
             );
@@ -563,13 +572,9 @@ mod tests {
         fn nested() {
             let expression = Expression::Sum(
                 Sum::new(vec![
-                    Expression::Term(Term::Constant(30)),
+                    Constant::new(30).into(),
                     Expression::Sum(
-                        Sum::new(vec![
-                            Expression::Term(Term::Constant(6)),
-                            Expression::Term(Term::Constant(2)),
-                        ])
-                        .unwrap(),
+                        Sum::new(vec![Constant::new(6).into(), Constant::new(2).into()]).unwrap(),
                     ),
                 ])
                 .unwrap(),
@@ -582,15 +587,15 @@ mod tests {
     }
 
     mod subtract {
-        use crate::expression::{Expression, Subtract, Term};
+        use crate::expression::{Constant, Expression, Subtract};
 
         #[test]
         fn multiple() {
             let expression = Expression::Subtract(
                 Subtract::new(vec![
-                    Expression::Term(Term::Constant(12)),
-                    Expression::Term(Term::Constant(3)),
-                    Expression::Term(Term::Constant(2)),
+                    Constant::new(12).into(),
+                    Constant::new(3).into(),
+                    Constant::new(2).into(),
                 ])
                 .unwrap(),
             );
@@ -604,13 +609,10 @@ mod tests {
         fn nested() {
             let expression = Expression::Subtract(
                 Subtract::new(vec![
-                    Expression::Term(Term::Constant(30)),
+                    Constant::new(30).into(),
                     Expression::Subtract(
-                        Subtract::new(vec![
-                            Expression::Term(Term::Constant(6)),
-                            Expression::Term(Term::Constant(2)),
-                        ])
-                        .unwrap(),
+                        Subtract::new(vec![Constant::new(6).into(), Constant::new(2).into()])
+                            .unwrap(),
                     ),
                 ])
                 .unwrap(),
@@ -623,25 +625,59 @@ mod tests {
     }
 
     #[test]
+    fn expression_get_answer1() {
+        // 5 + 6 / 6
+        let expression = Expression::Sum(
+            Sum::new(vec![
+                Constant::new(5).into(),
+                Expression::Divide(
+                    Divide::new(vec![Constant::new(6).into(), Constant::new(6).into()]).unwrap(),
+                ),
+            ])
+            .unwrap(),
+        );
+
+        assert_eq!(6.0, expression.get_answer());
+        let str_value = expression.formatted_vec().join("");
+        assert_eq!("5+6/6", str_value);
+    }
+
+    #[test]
+    fn expression_get_answer2() {
+        // 6 - 6 * 7
+        let expression = Expression::Subtract(
+            Subtract::new(vec![
+                Constant::new(6).into(),
+                Expression::Multiply(
+                    Multiplication::new(vec![Constant::new(6).into(), Constant::new(7).into()])
+                        .unwrap(),
+                ),
+            ])
+            .unwrap(),
+        );
+
+        assert_eq!(-36.0, expression.get_answer());
+        let str_value = expression.formatted_vec().join("");
+        assert_eq!("6-6*7", str_value);
+    }
+
+    #[test]
     fn expression_get_answer_nested_multiplication() {
         let expression1 = Expression::Multiply(
             Multiplication::new(vec![
-                Expression::Term(Term::Constant(10)),
-                Expression::Term(Term::Constant(5)),
-                Expression::Term(Term::Constant(2)),
+                Constant::new(10).into(),
+                Constant::new(5).into(),
+                Constant::new(2).into(),
             ])
             .unwrap(),
         );
 
         let expression2 = Expression::Multiply(
             Multiplication::new(vec![
-                Expression::Term(Term::Constant(10)),
+                Constant::new(10).into(),
                 Expression::Multiply(
-                    Multiplication::new(vec![
-                        Expression::Term(Term::Constant(5)),
-                        Expression::Term(Term::Constant(2)),
-                    ])
-                    .unwrap(),
+                    Multiplication::new(vec![Constant::new(5).into(), Constant::new(2).into()])
+                        .unwrap(),
                 ),
             ])
             .unwrap(),
