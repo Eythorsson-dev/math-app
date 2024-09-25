@@ -165,21 +165,24 @@ mod expression {
 
                 fn formatted_vec(&self) -> Vec<String> {
                     let mut response = self.0[0].formatted_vec();
-                    let current_operator_order = self.operator().get_operator_order();
+                    let current_operator = self.operator();
+                    let current_operator_order = current_operator.get_operator_order();
+                    let current_operator_commutative = current_operator.is_commutative();
+
 
                     for item in self.0.iter().skip(1) {
                         response.push($symbol.to_owned());
 
-                        let item_operator_order =
-                            item.get_operator().map(|o| o.get_operator_order());
+                        let operator = item.get_operator();
 
-                        let item_operator_commutative =
-                            item.get_operator().map(|o| o.is_commutative());
+                        let item_operator_order = operator.map(|o| o.get_operator_order());
+
+                        let item_operator_commutative = operator.map(|o| o.is_commutative());
 
                         let has_parenthesis = item_operator_order.is_some()
                             && current_operator_order <= item_operator_order.unwrap()
-                            // && current_operator_commutative
-                            && item_operator_commutative == Some(false)
+                            && (current_operator_commutative == false || item_operator_commutative == Some(false)
+                                || (current_operator_order < item_operator_order.unwrap()))
                             ;
 
                         if has_parenthesis {
@@ -478,14 +481,14 @@ mod tests {
                 ),
                 Expression::Divide(
                     Divide::new(vec![
-                        Constant::new(5).into(),
+                        Constant::new(6).into(),
                         Expression::Divide(
                             Divide::new(vec![
-                                Constant::new(6).into(),
+                                Constant::new(4).into(),
                                 Expression::Subtract(
                                     Subtract::new(vec![
-                                        Constant::new(7).into(),
-                                        Constant::new(8).into(),
+                                        Constant::new(3).into(),
+                                        Constant::new(1).into(),
                                     ])
                                     .unwrap(),
                                 ),
@@ -499,7 +502,7 @@ mod tests {
             .unwrap(),
         );
 
-        assert_eq!(expression.formatted_vec().join(""), "1+2*(3-4)+5/(6/(7-8))")
+        assert_eq!(expression.formatted_vec().join(""), "1+2*(3-4)+6/(4/(3-1))")
     }
 
     #[test]
@@ -575,7 +578,7 @@ mod tests {
     }
 
     mod multiplication {
-        use crate::expression::{Constant, Expression, Multiplication};
+        use crate::expression::{Constant, Expression, Multiplication, Sum};
 
         #[test]
         fn multiple() {
@@ -610,10 +613,29 @@ mod tests {
             let str_value = expression.formatted_vec().join("");
             assert_eq!("30*6*2", str_value);
         }
+
+        #[test]
+        fn nested_sum() {
+            // 4*(5+1)
+            let expression = Expression::Multiply(
+                Multiplication::new(vec![
+                    Constant::new(4).into(),
+                    Expression::Sum(
+                        Sum::new(vec![Constant::new(5).into(), Constant::new(1).into()])
+                            .unwrap(),
+                    ),
+                ])
+                .unwrap(),
+            );
+
+            assert_eq!(24.0, expression.get_answer());
+            let str_value = expression.formatted_vec().join("");
+            assert_eq!("4*(5+1)", str_value);
+        }
     }
 
     mod sum {
-        use crate::expression::{Constant, Expression, Sum};
+        use crate::expression::{Constant, Expression, Subtract, Sum};
 
         #[test]
         fn multiple() {
@@ -647,10 +669,27 @@ mod tests {
             let str_value = expression.formatted_vec().join("");
             assert_eq!("30+6+2", str_value);
         }
+
+        #[test]
+        fn nested_subtract() {
+            let expression = Expression::Sum(
+                Sum::new(vec![
+                    Constant::new(30).into(),
+                    Expression::Subtract(
+                        Subtract::new(vec![Constant::new(6).into(), Constant::new(2).into()]).unwrap(),
+                    ),
+                ])
+                .unwrap(),
+            );
+
+            assert_eq!(34.0, expression.get_answer());
+            let str_value = expression.formatted_vec().join("");
+            assert_eq!("30+(6-2)", str_value);
+        }
     }
 
     mod subtract {
-        use crate::expression::{Constant, Expression, Subtract};
+        use crate::expression::{Constant, Expression, Subtract, Sum};
 
         #[test]
         fn multiple() {
@@ -684,6 +723,61 @@ mod tests {
             assert_eq!(26.0, expression.get_answer());
             let str_value = expression.formatted_vec().join("");
             assert_eq!("30-(6-2)", str_value);
+        }
+
+        #[test]
+        fn nested_sum() {
+            let expression = Expression::Subtract(
+                Subtract::new(vec![
+                    Constant::new(30).into(),
+                    Expression::Sum(
+                        Sum::new(vec![Constant::new(6).into(), Constant::new(2).into()])
+                            .unwrap(),
+                    ),
+                ])
+                .unwrap(),
+            );
+
+            assert_eq!(22.0, expression.get_answer());
+            let str_value = expression.formatted_vec().join("");
+            assert_eq!("30-(6+2)", str_value);
+        }
+    }
+    mod addition {
+        use crate::expression::{Constant, Expression, Sum};
+
+        #[test]
+        fn multiple() {
+            let expression = Expression::Sum(
+                Sum::new(vec![
+                    Constant::new(12).into(),
+                    Constant::new(3).into(),
+                    Constant::new(2).into(),
+                ])
+                .unwrap(),
+            );
+
+            assert_eq!(17.0, expression.get_answer());
+            let str_value = expression.formatted_vec().join("");
+            assert_eq!("12+3+2", str_value);
+        }
+
+        #[test]
+        fn nested() {
+            let expression = Expression::Sum(
+                Sum::new(vec![
+                    Constant::new(30).into(),
+                    Expression::Sum(
+                        Sum::new(vec![Constant::new(6).into(), Constant::new(2).into()])
+                            .unwrap(),
+                    ),
+                ])
+                .unwrap(),
+            );
+
+            assert_eq!(38.0, expression.get_answer());
+            let str_value = expression.formatted_vec().join("");
+            assert_eq!("30+6+2", str_value);
         }
     }
 
