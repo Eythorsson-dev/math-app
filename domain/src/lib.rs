@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use expression::{Expression, Term};
+use expression::{Constant, Expression};
 use rand::{distributions::WeightedIndex, prelude::Distribution};
 
 #[derive(Debug)]
@@ -9,6 +9,7 @@ pub enum Error {
     ExpressionTooShort,
     OperatorMissing,
     TermMissing,
+    ConstantOptionOutOfRange,
 }
 type Result<T> = std::result::Result<T, Error>;
 
@@ -21,22 +22,25 @@ pub struct Equation {
 
 impl Equation {
     pub fn generate(options: &ExpressionOption, weights: OperatorWeights) -> Result<Self> {
-        let terms: Vec<Term> = (0..options.term_count.into())
-            .map(|_| Term::random_constant(&options.constant))
-            .collect();
+        let mut operator = weights.get_random_operator(&options.allowed_operators);
+        let constant_weights = ConstantWeights::new(Vec::new(), &options.constant);
 
-        let mut expression = Expression::random(
-            vec![Expression::Term(terms[0]), Expression::Term(terms[1])],
-            &options.allowed_operators,
-            &weights,
-        )?;
+        let first_constant = constant_weights.get_random();
+        let mut expression: Expression = first_constant.into();
 
-        for term in terms.iter().skip(2) {
-            expression = Expression::random(
-                vec![expression, Expression::Term(*term)],
-                &options.allowed_operators,
-                &weights,
-            )?;
+        for _ in 1..options.term_count.into() {
+            let constant_weights = ConstantWeights::new(Vec::new(), &options.constant);
+            let constant = if operator == Operator::Division {
+                let constant: f32 = constant_weights.get_random().into();
+                let divisor = expression.get_answer();
+                
+                Constant::new((constant * divisor) as i32)
+            } else {
+                constant_weights.get_random()
+            };
+
+            expression = Expression::create(&operator, vec![constant.into(), expression])?;
+            operator = weights.get_random_operator(&options.allowed_operators);
         }
 
         Ok(Self { expression })
@@ -89,17 +93,23 @@ impl Operator {
 mod expression {
     use rand::Rng;
 
-    use crate::{AllowedOperators, ConstantOption, Error, Operator, OperatorWeights, Result};
+    use crate::{ConstantOption, Error, Operator, Result};
 
-    #[derive(Debug, Clone, Copy)]
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     pub struct Constant(i32);
 
     impl Constant {
         pub fn new(value: i32) -> Self {
             Constant(value)
         }
-        pub fn to_string(&self) -> String {
+        pub fn to_string(self) -> String {
             self.0.to_string()
+        }
+    }
+
+    impl From<Constant> for i32 {
+        fn from(value: Constant) -> Self {
+            value.0
         }
     }
 
@@ -213,12 +223,8 @@ mod expression {
     }
 
     impl Expression {
-        pub fn random(
-            items: Vec<Expression>,
-            allowed_operators: &AllowedOperators,
-            options: &OperatorWeights,
-        ) -> Result<Self> {
-            Ok(match options.get_random_operator(allowed_operators) {
+        pub fn create(operator: &Operator, items: Vec<Expression>) -> Result<Self> {
+            Ok(match operator {
                 crate::Operator::Addition => Expression::Sum(Sum::new(items)?),
                 crate::Operator::Subtraction => Expression::Subtract(Subtract::new(items)?),
                 crate::Operator::Multiplication => {
@@ -267,6 +273,15 @@ pub struct ConstantOption {
     min: i32,
     max: i32,
 }
+impl ConstantOption {
+    pub fn new(min: i32, max: i32) -> Result<Self> {
+        if min > max {
+            return Err(Error::ConstantOptionOutOfRange);
+        }
+
+        Ok(Self { min, max })
+    }
+}
 
 pub struct AllowedOperators(Vec<Operator>);
 impl AllowedOperators {
@@ -303,6 +318,54 @@ pub struct ExpressionOption {
     constant: ConstantOption,
     allowed_operators: AllowedOperators,
     term_count: TermCount,
+}
+
+#[derive(Debug)]
+pub struct ConstantWeight {
+    constant: Constant,
+    weight: f32,
+}
+impl ConstantWeight {
+    pub fn new(constant: Constant, weight: f32) -> Result<Self> {
+        if (-1.0..=1.0).contains(&weight) == false {
+            return Err(Error::WeightOutOfRange);
+        }
+
+        Ok(Self { constant, weight })
+    }
+}
+
+#[derive(Debug)]
+pub struct ConstantWeights(Vec<ConstantWeight>);
+impl ConstantWeights {
+    pub fn new(mut weights: Vec<ConstantWeight>, options: &ConstantOption) -> Self {
+        let missing_constants = options.min..=options.max;
+        let missing_constants: Vec<Constant> = missing_constants
+            .map(|operator| Constant::new(operator))
+            .filter(|constant| weights.iter().any(|w| w.constant == *constant) == false)
+            .collect();
+
+        for constant in missing_constants {
+            weights.push(ConstantWeight::new(constant, 1.0).unwrap());
+        }
+
+        Self(weights)
+    }
+
+    pub fn get_random(&self) -> Constant {
+        if self.0.len() == 0 {
+            return Constant::new(0);
+        }
+
+        let options = &self.0;
+
+        let weights: Vec<f32> = options.iter().map(|x| x.weight).collect();
+
+        let dist = WeightedIndex::new(weights).unwrap();
+        let mut rng = rand::thread_rng();
+
+        self.0[dist.sample(&mut rng)].constant
+    }
 }
 
 #[derive(Debug)]
@@ -373,7 +436,7 @@ mod tests {
     }
 
     #[test]
-    fn get_random_equation() {
+    fn get_random_equations() {
         for _ in 0..20 {
             let weights = OperatorWeights::new(Vec::new());
             let options = ExpressionOption {
