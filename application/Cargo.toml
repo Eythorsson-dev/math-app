@@ -11,3 +11,4 @@ domain = { path = "../domain" }
 dotenv = "0.15.0"
 async-trait = "0.1"
 tokio = { version = "1", features = ["full"] }
+serde = { version = "1", features = ["derive"] }

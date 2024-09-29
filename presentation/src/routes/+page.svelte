@@ -2,6 +2,11 @@
   import { invoke } from "@tauri-apps/api/core";
   import { createCountdown } from "../stores/contdown";
   import type { Readable } from "svelte/store";
+  import { v4 as uuidv4 } from "uuid";
+
+  function createUid() {
+    return uuidv4();
+  }
 
   function getEquation(): Promise<{ expression: string[]; answer: number }> {
     return invoke("get_equation");
@@ -14,20 +19,36 @@
     return invoke("get_settings");
   }
 
+  type QuestionerId = string;
+  type CreateQuestionerDto = {
+    id: QuestionerId;
+    allotted_time: number;
+    tasks: CreateTaskDto[];
+  };
+
+  type CreateTaskDto = {
+    expression: string;
+    answered: number;
+    answer_correct: boolean;
+    answer_duration: number;
+    answered_at: number;
+  };
+
+  function createQuestioner(request: CreateQuestionerDto) {
+    return invoke("create_questioner", { request });
+  }
+
+  function unix_timestamp(date: Date): number {
+    return Math.floor(date.getTime() / 1000);
+  }
+
   function setNextEquation() {
     getEquation().then((value) => {
+      expressionShownUnix = unix_timestamp(new Date());
       equation = value.expression;
       answer = value.answer;
       answerOptions = getAnswerOptions();
     });
-  }
-
-  const numberOfOptions = 6;
-
-  function getAnswerOptions() {
-    const minOption =
-      answer - Math.round(Math.random() * (numberOfOptions - 1));
-    return new Array(numberOfOptions).fill(0).map((_, i) => minOption + i);
   }
 
   let audio: HTMLAudioElement;
@@ -38,19 +59,37 @@
     audioUrl = x.correct_audio_src;
 
     countdown = createCountdown(x.game_duration_sec, () => {
-      console.log("DONE!!");
+      createQuestioner({
+        id: createUid(),
+        allotted_time: x.game_duration_sec,
+        tasks,
+      });
+
+      tasks = [];
     });
 
     setNextEquation();
   });
 
+  let expressionShownUnix: number;
   let answer: number = 0;
   let equation: string[] = [];
   let answerOptions: number[] = [];
-
   let answered: number[] = [];
 
+  let tasks: CreateTaskDto[] = [];
+
   function chooseAnswer(value: number) {
+    let answeredAtUnix = unix_timestamp(new Date());
+
+    tasks.push({
+      expression: equation.join(""),
+      answered: value,
+      answer_correct: value == answer,
+      answer_duration: answeredAtUnix - expressionShownUnix,
+      answered_at: answeredAtUnix,
+    });
+
     if (value != answer) {
       answered = [...answered, value];
       return;
@@ -61,6 +100,14 @@
     audio.currentTime = 0;
     audio.play();
     answered = [];
+  }
+
+  const numberOfOptions = 6;
+
+  function getAnswerOptions() {
+    const minOption =
+      answer - Math.round(Math.random() * (numberOfOptions - 1));
+    return new Array(numberOfOptions).fill(0).map((_, i) => minOption + i);
   }
 
   function parse(items: string[]): { value: string; colorIndex: number }[] {

@@ -2,9 +2,10 @@ use std::fmt::Debug;
 
 use async_trait::async_trait;
 use domain::{
-    questioner::{Questioner, QuestionerId, Task},
-    Aggregate, Duration,
+    questioner::{ExpressionStr, Questioner, QuestionerId, Task},
+    Aggregate, DateTime, Duration,
 };
+use serde::Deserialize;
 
 pub mod env;
 
@@ -36,11 +37,20 @@ pub trait Repository<Entity: Aggregate> {
 
 pub trait QuestionerRepository: Repository<Questioner> {}
 
+#[derive(Deserialize)]
+pub struct TaskDto {
+    pub expression: ExpressionStr,
+
+    pub answered: i32,
+    pub answer_correct: bool,
+    pub answer_duration: Duration,
+    pub answered_at: DateTime,
+}
 pub enum QuestionerCommand {
     Create {
         id: QuestionerId,
         allotted_time: Duration,
-        tasks: Vec<Task>,
+        tasks: Vec<TaskDto>,
     },
 }
 
@@ -52,6 +62,18 @@ impl QuestionerCommand {
                 allotted_time,
                 tasks,
             } => {
+                let tasks = tasks
+                    .iter()
+                    .map(|x| {
+                        Task::new(
+                            x.expression.clone(),
+                            x.answered,
+                            x.answer_correct,
+                            x.answer_duration,
+                            x.answered_at,
+                        )
+                    })
+                    .collect();
                 let questioner = Questioner::create(id, allotted_time, tasks);
 
                 uow.questioner_repo()

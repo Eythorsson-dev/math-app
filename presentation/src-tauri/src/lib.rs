@@ -1,3 +1,4 @@
+use application::{env::load_env_file, QuestionerCommand, TaskDto};
 use domain::*;
 use expression::{
     operator::Operator,
@@ -5,7 +6,9 @@ use expression::{
     options::{AllowedOperators, ConstantOption, ExpressionOption, TermCount},
     Expression,
 };
-use serde::Serialize;
+use persistance::{get_unit_of_work, migrate_up};
+use questioner::QuestionerId;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize)]
 struct ExpressionDto {
@@ -57,6 +60,61 @@ fn get_settings() -> SettingsDto {
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////
+#[derive(Deserialize)]
+struct CreateQuestionerDto {
+    id: QuestionerId,
+    allotted_time: Duration,
+    tasks: Vec<TaskDto>,
+}
+
+impl From<CreateQuestionerDto> for QuestionerCommand {
+    fn from(value: CreateQuestionerDto) -> Self {
+        QuestionerCommand::Create {
+            id: value.id,
+            allotted_time: value.allotted_time,
+            tasks: value.tasks,
+        }
+    }
+}
+
+#[tauri::command]
+async fn create_questioner(request: CreateQuestionerDto) {
+    // TODO: REMOVE UNWRAP
+    let uow = get_unit_of_work(cfg!(test)).await.unwrap();
+    let command: QuestionerCommand = request.into();
+
+    command.handle(&uow).await.unwrap();
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::CreateQuestionerDto;
+
+    #[test]
+    pub fn can_deserialize() {
+        let json_str = r#"
+        {
+            "id": "6b69f438-e9cf-4e4b-94f9-9338fb79f805",
+            "allotted_time": 45,
+            "tasks": [
+                {
+                    "expression": "9*(9+5)",
+                    "answered": 127,
+                    "answer_correct": false,
+                    "answer_duration": 11,
+                    "answered_at": 1727628637
+                }
+            ]
+        }
+        "#;
+
+        let _value: CreateQuestionerDto = serde_json::from_str(json_str).unwrap();
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
+
 pub enum CorrectAudio {
     AchievementBell,
     MaleVoiceCheer,
@@ -88,10 +146,18 @@ impl CorrectAudio {
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
-pub fn run() {
+pub async fn run() {
+    load_env_file(cfg!(test));
+
+    migrate_up().await.unwrap();
+
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
-        .invoke_handler(tauri::generate_handler![get_equation, get_settings])
+        .invoke_handler(tauri::generate_handler![
+            get_equation,
+            get_settings,
+            create_questioner
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

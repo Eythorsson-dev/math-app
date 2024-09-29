@@ -29,8 +29,15 @@ impl std::error::Error for Error {}
 
 //////////////////////////////////////////////////////
 
-use dotenv::dotenv;
 use std::sync::OnceLock;
+
+pub fn load_env_file(test: bool) {
+    if test {
+        dotenv::from_filename(".env").unwrap();
+    } else {
+        dotenv::from_filename(".env.debug").unwrap();
+    }
+}
 
 pub fn core_config() -> &'static CoreConfig {
     static INSTANCE: OnceLock<CoreConfig> = OnceLock::new();
@@ -49,8 +56,6 @@ pub struct CoreConfig {
 
 impl CoreConfig {
     fn load_from_env() -> Result<CoreConfig> {
-        dotenv().unwrap();
-
         Ok(CoreConfig {
             // -- Db
             DB_URL: get_env("DATABASE_URL")?,

@@ -1,9 +1,10 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::{Aggregate, DateTime, DomainEvents, Duration};
 
-#[derive(Debug, Serialize, Clone, Copy, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq)]
+#[serde(transparent)]
 pub struct QuestionerId(Uuid);
 impl QuestionerId {
     pub fn new() -> Self {
@@ -113,7 +114,7 @@ impl Questioner {
 }
 
 // TODO: Implement Expression parse_str and parse_str_vec so that we can replace this struct with Expression
-#[derive(Debug, Serialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct ExpressionStr(String);
 impl ExpressionStr {
     pub fn parse(value: &str) -> ExpressionStr {

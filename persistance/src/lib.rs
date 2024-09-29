@@ -1,12 +1,16 @@
 pub mod questioner;
 
-use std::sync::Arc;
+use std::{path::Path, sync::Arc};
 
-use application::{env::core_config, UnitOfWork};
+use application::{
+    env::{core_config, load_env_file},
+    UnitOfWork,
+};
 use async_trait::async_trait;
 use domain::DomainEvents;
 use questioner::SqlxQuestionerRepository;
 use sqlx::{
+    migrate::Migrator,
     query::Query,
     sqlite::{SqliteArguments, SqlitePoolOptions},
     Pool, Sqlite,
@@ -103,7 +107,7 @@ where
     }
 }
 
-struct SqlxUnitOfWork {
+pub struct SqlxUnitOfWork {
     queue: Arc<Mutex<EventQueue>>, // TODO: Create an event bus that emits the events onto it
     pool: Arc<Pool<Sqlite>>,
     pub questioner: SqlxQuestionerRepository,
@@ -145,6 +149,21 @@ impl SqlxUnitOfWork {
     }
 }
 
+pub async fn migrate_up() -> std::result::Result<(), sqlx::Error> {
+    let db_url = &core_config().DB_URL;
+
+    let migrator = Migrator::new(Path::new("../../migrations")).await?;
+
+    let pool = SqlitePoolOptions::new()
+        .max_connections(1)
+        .connect(db_url)
+        .await?;
+
+    migrator.run(&pool).await?;
+
+    Ok(())
+}
+
 pub async fn establish_connection_pool() -> Result<Pool<Sqlite>> {
     let pool = establish_connection(&core_config().DB_URL).await?;
 
@@ -162,7 +181,8 @@ pub async fn establish_connection(db_url: &String) -> Result<Pool<Sqlite>> {
     Ok(pool)
 }
 
-pub async fn get_unit_of_work() -> Result<SqlxUnitOfWork> {
+pub async fn get_unit_of_work(test: bool) -> Result<SqlxUnitOfWork> {
+    load_env_file(test);
     let pool = establish_connection_pool().await?;
 
     Ok(SqlxUnitOfWork::new(pool))
@@ -170,9 +190,9 @@ pub async fn get_unit_of_work() -> Result<SqlxUnitOfWork> {
 
 #[cfg(test)]
 mod tests {
-    use application::{QuestionerCommand, Repository, UnitOfWork};
+    use application::{QuestionerCommand, Repository, TaskDto, UnitOfWork};
     use domain::{
-        questioner::{ExpressionStr, QuestionerId, Task},
+        questioner::{ExpressionStr, QuestionerId},
         DateTime, Duration,
     };
 
@@ -180,15 +200,14 @@ mod tests {
 
     #[tokio::test]
     async fn can_create() {
-        let uow = get_unit_of_work().await.unwrap();
+        let uow = get_unit_of_work(cfg!(test)).await.unwrap();
         create(&uow).await.unwrap();
     }
 
     #[tokio::test]
     async fn can_get_by_id() {
-        let uow = get_unit_of_work().await.unwrap();
+        let uow = get_unit_of_work(cfg!(test)).await.unwrap();
         let id = create(&uow).await.unwrap();
-
 
         let entity = uow.questioner_repo().get_by_id(id).await.unwrap();
 
@@ -200,13 +219,13 @@ mod tests {
         let command = QuestionerCommand::Create {
             id,
             allotted_time: Duration::from_seconds(45),
-            tasks: vec![Task::new(
-                ExpressionStr::parse("5+4-1"),
-                8,
-                true,
-                Duration::from_seconds(2),
-                DateTime::now(),
-            )],
+            tasks: vec![TaskDto {
+                expression: ExpressionStr::parse("5+4-1"),
+                answered: 8,
+                answer_correct: true,
+                answer_duration: Duration::from_seconds(2),
+                answered_at: DateTime::now(),
+            }],
         };
 
         command.handle(uow).await?;
