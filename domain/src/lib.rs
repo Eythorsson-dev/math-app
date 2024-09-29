@@ -15,7 +15,7 @@ type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug)]
 pub struct Equation {
-    expression: Expression,
+    pub expression: Expression,
     // answer: Expression,
     // answered: Option<Expression>,
 }
@@ -90,7 +90,7 @@ impl Operator {
     }
 }
 
-mod expression {
+pub mod expression {
     use rand::Rng;
 
     use crate::{ConstantOption, Error, Operator, Result};
@@ -318,9 +318,9 @@ impl From<TermCount> for u8 {
 }
 
 pub struct ExpressionOption {
-    constant: ConstantOption,
-    allowed_operators: AllowedOperators,
-    term_count: TermCount,
+    pub constant: ConstantOption,
+    pub allowed_operators: AllowedOperators,
+    pub term_count: TermCount,
 }
 
 #[derive(Debug)]
