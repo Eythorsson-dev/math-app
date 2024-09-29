@@ -3,6 +3,7 @@
   import { createCountdown } from "../stores/contdown";
   import type { Readable } from "svelte/store";
   import { v4 as uuidv4 } from "uuid";
+  import Button from "./button.svelte";
 
   function createUid() {
     return uuidv4();
@@ -145,23 +146,9 @@
       {/each}
     </div>
 
-    <div class="grid grid-cols-2 mb-8">
+    <div class="grid grid-cols-2 gap-2 mb-8">
       {#each answerOptions as option, index}
-        <button
-          class={[
-            ...[
-              "text-xl border-b-2 rounded w-full border-gray-200 p-3 m-1 text-center text-gray-700",
-              answered.includes(option) == false
-                ? "bg-white active:bg-gray-50"
-                : "",
-              answered.includes(option) ? " bg-gray-200" : "",
-            ],
-          ].join(" ")}
-          class:justify-self-end={index % 2 == 0}
-          disabled={answered.includes(option)}
-          on:click={() => chooseAnswer(option)}
-          tabindex="-1">{option}</button
-        >
+        <Button disabled={answered.includes(option)} on:click={() => chooseAnswer(option)}>{option}</Button>
       {/each}
     </div>
   </div>
