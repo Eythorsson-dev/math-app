@@ -1,5 +1,10 @@
 use domain::*;
-use expression::Expression;
+use expression::{
+    operator::Operator,
+    operator_weights::OperatorWeights,
+    options::{AllowedOperators, ConstantOption, ExpressionOption, TermCount},
+    Expression,
+};
 use serde::Serialize;
 
 #[derive(Debug, Serialize)]
@@ -33,49 +38,49 @@ fn get_equation() -> ExpressionDto {
 
     let weights = OperatorWeights::new(vec![]);
 
-    let equation = Equation::generate(&options, weights).unwrap();
+    let expression = Expression::generate(&options, weights).unwrap();
 
-    equation.expression.into()
+    expression.into()
 }
 
 #[derive(Serialize)]
 struct SettingsDto {
     correct_audio_src: Option<String>,
-    game_duration_sec: i8
+    game_duration_sec: i8,
 }
 
 #[tauri::command]
 fn get_settings() -> SettingsDto {
     SettingsDto {
-        correct_audio_src: Some(CorrectAudio::achievement_bell.get_src()),
-        game_duration_sec: 45
+        correct_audio_src: Some(CorrectAudio::AchievementBell.get_src()),
+        game_duration_sec: 45,
     }
 }
 
 pub enum CorrectAudio {
-    achievement_bell,
-    male_voice_cheer,
-    male_voice_yes,
-    quick_win,
-    unlock_game,
+    AchievementBell,
+    MaleVoiceCheer,
+    MaleVoiceYes,
+    QuickWin,
+    UnlockGame,
 }
 
 impl CorrectAudio {
     pub fn get_src(&self) -> String {
         match self {
-            CorrectAudio::achievement_bell => {
+            CorrectAudio::AchievementBell => {
                 "correct-answer/mixkit-achievement-bell-600.mp3".to_owned()
             }
-            CorrectAudio::male_voice_cheer => {
+            CorrectAudio::MaleVoiceCheer => {
                 "correct-answer/mixkit-male-voice-cheer-2010.mp3".to_owned()
             }
-            CorrectAudio::male_voice_yes => {
+            CorrectAudio::MaleVoiceYes => {
                 "correct-answer/mixkit-males-yes-victory-2012.mp3".to_owned()
             }
-            CorrectAudio::quick_win => {
+            CorrectAudio::QuickWin => {
                 "correct-answer/mixkit-quick-win-video-game-notification-269.mp3".to_owned()
             }
-            CorrectAudio::unlock_game => {
+            CorrectAudio::UnlockGame => {
                 "correct-answer/mixkit-unlock-game-notification-253.mp3".to_owned()
             }
         }
