@@ -2,4 +2,5 @@
 members = [
     "./domain",
     "./presentation/src-tauri",
+    "./persistance", "application",
 ]
