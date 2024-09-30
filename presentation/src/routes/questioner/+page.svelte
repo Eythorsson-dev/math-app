@@ -3,7 +3,8 @@
   import { createCountdown } from "../../stores/contdown";
   import type { Readable } from "svelte/store";
   import { v4 as uuidv4 } from "uuid";
-  import Button from "../button.svelte";
+  import Button from "../../button.svelte";
+  import { goto } from "$app/navigation";
 
   function createUid() {
     return uuidv4();
@@ -59,14 +60,15 @@
   getSettings().then((x) => {
     audioUrl = x.correct_audio_src;
 
-    countdown = createCountdown(x.game_duration_sec, () => {
-      createQuestioner({
+    countdown = createCountdown(x.game_duration_sec, async () => {
+      await createQuestioner({
         id: createUid(),
         allotted_time: x.game_duration_sec,
         tasks,
       });
 
       tasks = [];
+      goto("/");
     });
 
     setNextEquation();
@@ -138,11 +140,11 @@
 
 <div class="flex items-center justify-center flex-col h-full w-full">
   <div class="h-full flex flex-center flex-col justify-between w-full">
-    <div class="flex justify-between items-center m-3">
+    <div class="flex justify-between items-center">
       <div class="w-8"></div>
       <h1 class="text-md text-center text-gray-400">{$countdown}</h1>
       <div class="w-8">
-        <a class="rounded-lg p-1 active:bg-slate-200" href="/">
+        <a class="rounded-lg p-1 active:bg-slate-200 inline-block" href="/">
           <svg
             xmlns="http://www.w3.org/2000/svg"
             fill="none"

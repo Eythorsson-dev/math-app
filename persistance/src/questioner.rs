@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use application::{QuestionerRepository, Repository};
+use application::{QuestionerRepository, QuestionerStats, Repository};
 use async_trait::async_trait;
 use domain::{
     questioner::{ExpressionStr, Questioner, QuestionerEvent, QuestionerId, Task},
@@ -21,11 +21,12 @@ impl EventQuery for QuestionerEvent {
                 allotted_time,
                 correct_answers,
             } => sqlx::query(
-                "INSERT INTO Questioners (id, allotted_time, correct_answers) VALUES (?, ?, ?)",
+                "INSERT INTO Questioners (id, allotted_time, correct_answers, created_at) VALUES (?, ?, ?, ?)",
             )
             .bind(id.get_value())
             .bind(allotted_time.unix_timestamp())
-            .bind(correct_answers.get_value()),
+            .bind(correct_answers.get_value())
+            .bind(DateTime::now().unix_timestamp()),
             QuestionerEvent::TaskAnswered {
                 questioner_id,
                 expression,
@@ -58,7 +59,66 @@ impl SqlxQuestionerRepository {
     }
 }
 
-impl QuestionerRepository for SqlxQuestionerRepository {}
+#[derive(FromRow)]
+struct QuestionerStatsDto {
+    pub daily_streak: u32,
+    pub high_score: u32,
+    pub previous_score: u32,
+}
+
+#[async_trait]
+impl QuestionerRepository for SqlxQuestionerRepository {
+    async fn get_stats(&self) -> Result<QuestionerStats> {
+        let stats: Option<QuestionerStatsDto> = sqlx::query_as(
+            r#"
+            WITH RECURSIVE date_streak(day, streak) AS (
+            SELECT
+                date('now') AS day, -- Start from today
+                1 AS streak -- Initialize streak
+            UNION ALL
+            SELECT
+                date(day, '-1 day'),
+                streak + 1
+            FROM date_streak
+            WHERE date(day, '-1 day') IN (
+                SELECT date(datetime(created_at, 'unixepoch'))
+                FROM Questioners
+                GROUP BY date(datetime(created_at, 'unixepoch'))
+            )
+            ),
+            previous_score AS (
+                SELECT correct_answers AS previous_score
+                FROM Questioners
+                ORDER BY created_at DESC
+                LIMIT 1
+            )
+            SELECT 
+            MAX(s.streak) AS daily_streak,
+            MAX(q.correct_answers) AS high_score,
+            p.previous_score
+            FROM date_streak s
+            CROSS JOIN previous_score p
+            LEFT JOIN Questioners q;
+        "#,
+        )
+        .fetch_optional(self.pool.as_ref())
+        .await?;
+
+        Ok(if let Some(stats) = stats {
+            QuestionerStats {
+                high_score: stats.high_score,
+                daily_streak: stats.daily_streak,
+                previous_score: stats.previous_score,
+            }
+        } else {
+            QuestionerStats {
+                high_score: 0,
+                daily_streak: 0,
+                previous_score: 0,
+            }
+        })
+    }
+}
 
 #[async_trait]
 impl Repository<Questioner> for SqlxQuestionerRepository {
@@ -67,6 +127,7 @@ impl Repository<Questioner> for SqlxQuestionerRepository {
     async fn generate_id(&self) -> QuestionerId {
         QuestionerId::new()
     }
+
     async fn get_by_id(&self, id: QuestionerId) -> Result<Option<Questioner>> {
         let questioner: Option<QuestionerDto> =
             sqlx::query_as("SELECT id, allotted_time FROM Questioners WHERE id = ?")

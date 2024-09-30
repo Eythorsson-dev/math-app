@@ -8,3 +8,4 @@ This project is still in its mvp phase, which is:
 - Divisions by 0 are possible
 - Divisions can become really big Example: 119 / (8 + 9)
 - I can press play to play the audio
+- Auto migrate does not work
