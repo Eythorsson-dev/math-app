@@ -3,7 +3,8 @@
 CREATE TABLE Questioners (
     id TEXT NOT NULL PRIMARY KEY,
     allotted_time BIGINT NOT NULL,
-    correct_answers INTEGER NOT NULL
+    correct_answers INTEGER NOT NULL,
+    created_at INTEGER NOT NULL
 );
 
 CREATE TABLE Tasks (

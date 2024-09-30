@@ -5,7 +5,7 @@ use domain::{
     questioner::{ExpressionStr, Questioner, QuestionerId, Task},
     Aggregate, DateTime, Duration,
 };
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 pub mod env;
 
@@ -35,9 +35,20 @@ pub trait Repository<Entity: Aggregate> {
     async fn delete(&self, entity: Entity) -> Result<Entity, Self::Error>;
 }
 
-pub trait QuestionerRepository: Repository<Questioner> {}
 
-#[derive(Deserialize)]
+pub struct QuestionerStats {
+    pub high_score: u32,
+    pub daily_streak: u32,
+    pub previous_score: u32
+}
+
+#[async_trait]
+pub trait QuestionerRepository: Repository<Questioner> {
+    async fn get_stats(&self) -> Result<QuestionerStats, Self::Error>;
+    
+}
+
+#[derive(Serialize, Deserialize)]
 pub struct TaskDto {
     pub expression: ExpressionStr,
 
@@ -46,6 +57,19 @@ pub struct TaskDto {
     pub answer_duration: Duration,
     pub answered_at: DateTime,
 }
+
+impl From<Task> for TaskDto {
+    fn from(value: Task) -> Self {
+        TaskDto {
+            expression: value.expression().clone(),
+            answered: value.answered(),
+            answer_correct: value.answer_correct(),
+            answer_duration: value.answer_duration(),
+            answered_at: value.answered_at(),
+        }
+    }
+}
+
 pub enum QuestionerCommand {
     Create {
         id: QuestionerId,

@@ -111,6 +111,22 @@ impl Questioner {
 
         questioner
     }
+
+    pub fn id(&self) -> QuestionerId {
+        self.id
+    }
+
+    pub fn allotted_time(&self) -> Duration {
+        self.allotted_time
+    }
+
+    pub fn correct_answers(&self) -> CorrectAnswers {
+        self.correct_answers
+    }
+
+    pub fn tasks(&self) -> &[Task] {
+        &self.tasks
+    }
 }
 
 // TODO: Implement Expression parse_str and parse_str_vec so that we can replace this struct with Expression
@@ -161,5 +177,25 @@ impl Task {
             answer_duration: self.answer_duration,
             answered_at: self.answered_at,
         }
+    }
+
+    pub fn expression(&self) -> &ExpressionStr {
+        &self.expression
+    }
+
+    pub fn answered(&self) -> i32 {
+        self.answered
+    }
+
+    pub fn answer_correct(&self) -> bool {
+        self.answer_correct
+    }
+
+    pub fn answer_duration(&self) -> Duration {
+        self.answer_duration
+    }
+
+    pub fn answered_at(&self) -> DateTime {
+        self.answered_at
     }
 }
