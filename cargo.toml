@@ -2,5 +2,9 @@
 members = [
     "./domain",
     "./presentation/src-tauri",
-    "./persistance", "application",
+    "./persistance",
+    "application",
 ]
+
+[profile.dev]
+incremental = true # Compile your binary in smaller steps.

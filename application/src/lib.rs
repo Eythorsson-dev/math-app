@@ -11,7 +11,7 @@ pub mod env;
 
 #[derive(Debug)]
 pub enum Error {
-    Persistance(String),
+    Persistence(String),
 }
 
 #[async_trait]
@@ -35,17 +35,15 @@ pub trait Repository<Entity: Aggregate> {
     async fn delete(&self, entity: Entity) -> Result<Entity, Self::Error>;
 }
 
-
 pub struct QuestionerStats {
     pub high_score: u32,
     pub daily_streak: u32,
-    pub previous_score: u32
+    pub previous_score: u32,
 }
 
 #[async_trait]
 pub trait QuestionerRepository: Repository<Questioner> {
     async fn get_stats(&self) -> Result<QuestionerStats, Self::Error>;
-    
 }
 
 #[derive(Serialize, Deserialize)]
@@ -103,13 +101,13 @@ impl QuestionerCommand {
                 uow.questioner_repo()
                     .save(questioner)
                     .await
-                    .map_err(|err| Error::Persistance(format!("{:?}", err)))?;
+                    .map_err(|err| Error::Persistence(format!("{:?}", err)))?;
             }
         }
 
         uow.commit()
             .await
-            .map_err(|err| Error::Persistance(format!("{:?}", err)))?;
+            .map_err(|err| Error::Persistence(format!("{:?}", err)))?;
 
         Ok(())
     }

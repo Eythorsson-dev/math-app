@@ -17,6 +17,8 @@ use sqlx::{
 };
 use tokio::sync::Mutex;
 
+pub static MIGRATOR: sqlx::migrate::Migrator = sqlx::migrate!("../migrations");
+
 type Result<T> = std::result::Result<T, Error>;
 #[derive(Debug)]
 pub enum Error {
@@ -37,7 +39,7 @@ impl From<sqlx::Error> for Error {
 
 impl From<Error> for application::Error {
     fn from(value: Error) -> Self {
-        application::Error::Persistance(value.get_message())
+        application::Error::Persistence(value.get_message())
     }
 }
 
@@ -195,18 +197,19 @@ mod tests {
         questioner::{ExpressionStr, QuestionerId},
         DateTime, Duration,
     };
+    use sqlx::SqlitePool;
 
-    use crate::get_unit_of_work;
+    use crate::SqlxUnitOfWork;
 
-    #[tokio::test]
-    async fn can_create() {
-        let uow = get_unit_of_work(cfg!(test)).await.unwrap();
+    #[sqlx::test(migrator = "crate::MIGRATOR")]
+    async fn can_create(pool: SqlitePool) {
+        let uow = SqlxUnitOfWork::new(pool);
         create(&uow).await.unwrap();
     }
 
-    #[tokio::test]
-    async fn can_get_by_id() {
-        let uow = get_unit_of_work(cfg!(test)).await.unwrap();
+    #[sqlx::test(migrator = "crate::MIGRATOR")]
+    async fn can_get_by_id(pool: SqlitePool) {
+        let uow = SqlxUnitOfWork::new(pool);
         let id = create(&uow).await.unwrap();
 
         let entity = uow.questioner_repo().get_by_id(id).await.unwrap();

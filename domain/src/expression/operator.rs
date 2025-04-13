@@ -38,7 +38,6 @@ impl Operator {
     }
 }
 
-
 macro_rules! create_operator {
     ($name:ident, $symbol:expr, $operator:expr, $calculate:expr) => {
         #[derive(Debug, Clone)]
@@ -106,3 +105,24 @@ create_operator!(Sum, "+", Operator::Addition, |a, b| a + b);
 create_operator!(Subtract, "-", Operator::Subtraction, |a, b| a - b);
 create_operator!(Multiplication, "*", Operator::Multiplication, |a, b| a * b);
 create_operator!(Divide, "/", Operator::Division, |a, b| a / b);
+
+mod tests {
+    use crate::expression::{
+        operator::Subtract,
+        term::{Constant, Term},
+        Expression,
+    };
+
+    #[test]
+    pub fn test() {
+        let value = Subtract::new(vec![
+            Expression::Term(Term::Constant(Constant::new(111))),
+            Expression::Term(Term::Constant(Constant::new(222))),
+            Expression::Term(Term::Constant(Constant::new(333))),
+        ])
+        .unwrap();
+
+        println!("{:?}", value.formatted_vec());
+        println!("{:?}", value.get_answer())
+    }
+}

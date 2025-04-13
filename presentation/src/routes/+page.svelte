@@ -7,6 +7,8 @@
   import type { PageData } from './$types';
 	
 	export let data: PageData;
+
+  alert("Hello World")
 </script>
 
 <div class="flex items-center justify-center flex-col h-full w-full">
